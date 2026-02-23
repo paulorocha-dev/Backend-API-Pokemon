@@ -3,8 +3,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
 import os
 
-MEU_USUARIO = os.getenv("MEU_USUARIO") or "pokemon"  # Valor padrão para desenvolvimento
-MINHA_SENHA = os.getenv("MINHA_SENHA") or "pokemon123"  # Valor padrão para desenvolvimento
+MEU_USUARIO = os.getenv("MEU_USUARIO")
+MINHA_SENHA = os.getenv("MINHA_SENHA")
 
 security = HTTPBasic()
 
