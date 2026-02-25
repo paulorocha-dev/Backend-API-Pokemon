@@ -1,22 +1,22 @@
 # Endpoints CRUD
 
 from fastapi import APIRouter, Depends, HTTPException
+from redis.asyncio.client import Redis
 from fastapi.security import HTTPBasicCredentials
 from sqlalchemy.orm import Session
 
-from database import get_db
-from services.auth import autenticar_meu_usuario
-import crud
-import schemas
+from app.database import get_db
+from app.services.auth import autenticar_meu_usuario
+from app import crud, schemas
+from app.deps import get_redis
 
-from services.pokeapi import (
+from app.services.pokeapi import (
     fetch_pokemons_from_api,
     fetch_pokemon_raw_from_api,
     fetch_pokemon_for_db,
 )
 
 router = APIRouter(prefix="/pokemons")
-
 
 # -------------------------
 # Helpers
@@ -57,16 +57,20 @@ def map_pokeapi_detail(detail: dict) -> dict:
     response_model=schemas.PokemonListResponse,
     tags=["PokeAPI (Externo)"],
 )
-async def list_pokemons(limit: int = 20, offset: int = 0, credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
-    """Listagem detalhada com paginação (dados vindos da PokeAPI)."""
-    pokeapi_list = await fetch_pokemons_from_api(limit=limit, offset=offset)
+async def list_pokemons(
+    limit: int = 20,
+    offset: int = 0,
+    credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario),
+    redis: Redis = Depends(get_redis),
+):
+    pokeapi_list = await fetch_pokemons_from_api(redis, limit=limit, offset=offset)
 
     total = pokeapi_list["count"]
     items = pokeapi_list["results"]
 
     data = []
     for item in items:
-        detail = await fetch_pokemon_raw_from_api(item["name"])
+        detail = await fetch_pokemon_raw_from_api(redis, item["name"])
         data.append(map_pokeapi_detail(detail))
 
     return {
@@ -80,9 +84,12 @@ async def list_pokemons(limit: int = 20, offset: int = 0, credentials: HTTPBasic
     response_model=schemas.PokemonAPIListItem,
     tags=["PokeAPI (Externo)"]
 )
-async def get_pokemon_from_pokeapi(name_or_id: str, credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
-    """Busca um Pokémon diretamente da PokeAPI."""
-    detail = await fetch_pokemon_raw_from_api(name_or_id)
+async def get_pokemon_from_pokeapi(
+    name_or_id: str,
+    credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario),
+    redis: Redis = Depends(get_redis),
+):
+    detail = await fetch_pokemon_raw_from_api(redis, name_or_id)
     return map_pokeapi_detail(detail)
 
 
@@ -128,9 +135,13 @@ def get_pokemon_db(pokemon_id: int, db: Session = Depends(get_db), credentials: 
     status_code=201,
     tags=["Banco de Dados (CRUD)"]
 )
-async def create_pokemon(name: str, db: Session = Depends(get_db), credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
-    """Cria um Pokémon no banco usando dados base da PokeAPI."""
-    data = await fetch_pokemon_for_db(name)
+async def create_pokemon(
+    name: str,
+    db: Session = Depends(get_db),
+    credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario),
+    redis: Redis = Depends(get_redis),
+):
+    data = await fetch_pokemon_for_db(redis, name)
 
     created = crud.create_pokemon(db, schemas.PokemonCreate(**data))
     if not created:

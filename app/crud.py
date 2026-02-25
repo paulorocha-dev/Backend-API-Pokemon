@@ -1,8 +1,8 @@
 # Operações no banco de dados
 
 from sqlalchemy.orm import Session
-from models import Pokemon
-from schemas import PokemonCreate, PokemonUpdate
+from app.models import Pokemon
+from app.schemas import PokemonCreate, PokemonUpdate
 from sqlalchemy.exc import IntegrityError
 
 def create_pokemon(db: Session, pokemon: PokemonCreate):
